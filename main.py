@@ -104,6 +104,233 @@ class ProxySellerAPI:
         # Return the lists for use in other functions
         return lists
 
+    def download_proxies(self):
+        """Download proxies from existing lists with support for range selection"""
+        # First, get all lists
+        lists = self.get_lists()
+        available_lists = self.display_lists(lists)
+
+        if not available_lists:
+            return
+
+        # Ask for list selection
+        try:
+            print("\nВы можете выбрать списки следующими способами:")
+            print("1. Отдельные номера через запятую (например: 1,3,5)")
+            print("2. Диапазон в квадратных скобках (например: [10, 20])")
+            selection_input = input("\nВыберите номера списков для скачивания прокси: ")
+
+            selections = []
+
+            # Check if it's a range in square brackets
+            if selection_input.strip().startswith('[') and selection_input.strip().endswith(']'):
+                # Extract the range
+                range_content = selection_input.strip()[1:-1]  # Remove the brackets
+                range_parts = [part.strip() for part in range_content.split(',')]
+
+                if len(range_parts) == 2 and range_parts[0].isdigit() and range_parts[1].isdigit():
+                    start = int(range_parts[0])
+                    end = int(range_parts[1])
+
+                    # Create a list of all numbers in the range (inclusive)
+                    selections = list(range(start, end + 1))
+                else:
+                    print("Ошибка: Неверный формат диапазона. Ожидается [start, end].")
+                    return
+            else:
+                # Process as comma-separated list
+                selections = [int(x.strip()) for x in selection_input.split(',') if x.strip().isdigit()]
+
+            # Validate selections
+            valid_selections = []
+            for selection in selections:
+                if 1 <= selection <= len(available_lists):
+                    valid_selections.append(selection)
+                else:
+                    print(f"Предупреждение: Номер {selection} вне диапазона и будет пропущен.")
+
+            if not valid_selections:
+                print("Ошибка: Не выбрано ни одного действительного списка.")
+                return
+
+            # Choose proxy format
+            print("\nВыберите формат прокси:")
+            print("1. login:password@host:port (default)")
+            print("2. login:password:host:port")
+            print("3. host:port:login:password")
+            print("4. host:port@login:password")
+
+            format_choice = input("Выберите формат [1]: ") or "1"
+            proxy_format = int(format_choice) if format_choice.isdigit() and 1 <= int(format_choice) <= 4 else 1
+
+            # Choose export format
+            print("\nВыберите формат экспорта:")
+            print("1. txt (default)")
+            print("2. csv")
+            print("3. json")
+
+            export_format = input("Выберите формат [1]: ") or "1"
+            if export_format == "1":
+                file_ext = "txt"
+                export_type = "txt"
+            elif export_format == "2":
+                file_ext = "csv"
+                export_type = "csv"
+            elif export_format == "3":
+                file_ext = "json"
+                export_type = "json"
+            else:
+                file_ext = "txt"
+                export_type = "txt"
+
+            # Changed default to 'y' for merging files
+            merge_files = input("\nОбъединить все прокси в один файл? (y/n, по умолчанию: y): ").lower() != 'n'
+
+            # Process each selected list
+            all_proxies = []
+            selected_list_names = []
+            successful_downloads = 0
+
+            for selection in valid_selections:
+                # Get the selected list
+                selected_list = available_lists[selection - 1]
+                list_id = selected_list.get('id')
+                list_title = selected_list.get('title', f'proxies_{list_id}')
+
+                # Get country information for filename
+                countries = []
+                if 'geo' in selected_list:
+                    geo_info = selected_list['geo']
+                    # Check if geo is a list of country objects
+                    if isinstance(geo_info, list):
+                        for geo in geo_info:
+                            if isinstance(geo, dict) and 'country' in geo:
+                                countries.append(geo['country'])
+                    # Or if it's a single country object
+                    elif isinstance(geo_info, dict) and 'country' in geo_info:
+                        countries.append(geo_info['country'])
+
+                countries_str = "_".join(countries) if countries else 'no_country'
+
+                # Make API request to download proxies
+                url = f'https://proxy-seller.com/personal/api/v1/{self.api_key}/proxy/download/resident'
+
+                # Add listId parameter
+                params = {
+                    'format': export_type,
+                    'listId': list_id
+                }
+
+                print(f"\nЗагрузка прокси из списка '{list_title}'...")
+
+                try:
+                    response = requests.get(url, params=params)
+
+                    if response.status_code == 200:
+                        # Create a better filename based on list title and countries
+                        safe_title = ''.join(c for c in list_title if c.isalnum() or c in ' _-').replace(' ', '_')
+                        filename = f"{safe_title}_{countries_str}.{file_ext}"
+
+                        # Keep track of list names for merged filename
+                        selected_list_names.append(safe_title)
+
+                        # Process the response based on the format
+                        content = response.text
+                        formatted_content = ""
+
+                        # If user requested a specific format and we got raw data, convert it
+                        if proxy_format != 1 and export_type == "txt":
+                            # Assume one line per proxy in login:password@host:port format
+                            lines = content.splitlines()
+                            formatted_lines = []
+                            for line in lines:
+                                try:
+                                    # Parse the line
+                                    auth, host_port = line.split('@', 1)
+                                    login, password = auth.split(':', 1)
+                                    host, port = host_port.split(':', 1)
+
+                                    # Reformat according to user's choice
+                                    if proxy_format == 2:
+                                        # login:password:host:port
+                                        formatted = f"{login}:{password}:{host}:{port}"
+                                    elif proxy_format == 3:
+                                        # host:port:login:password
+                                        formatted = f"{host}:{port}:{login}:{password}"
+                                    elif proxy_format == 4:
+                                        # host:port@login:password
+                                        formatted = f"{host}:{port}@{login}:{password}"
+                                    else:
+                                        # Default format (shouldn't happen here)
+                                        formatted = line
+
+                                    formatted_lines.append(formatted)
+                                except:
+                                    # If parsing fails, keep the original line
+                                    formatted_lines.append(line)
+
+                            # Join all formatted lines
+                            formatted_content = "\n".join(formatted_lines)
+                        else:
+                            # Use the content as is
+                            formatted_content = content
+
+                        # If we're merging files, add to the list
+                        if merge_files:
+                            all_proxies.append(formatted_content)
+                        else:
+                            # Save to individual file
+                            if export_type in ["txt", "csv"]:
+                                with open(filename, "w") as file:
+                                    file.write(formatted_content)
+                            elif export_type == "json":
+                                try:
+                                    json_data = response.json()
+                                    with open(filename, "w") as file:
+                                        json.dump(json_data, file, indent=4)
+                                except Exception as e:
+                                    print(f"Ошибка при обработке JSON для списка '{list_title}': {str(e)}")
+                                    # Save raw content as fallback
+                                    with open(filename, "w") as file:
+                                        file.write(formatted_content)
+
+                            print(f"Прокси успешно загружены и сохранены в файл '{filename}'.")
+
+                        successful_downloads += 1
+                    else:
+                        print(
+                            f'Ошибка при загрузке прокси из списка "{list_title}". Код ошибки: {response.status_code}')
+                        print('Ответ сервера:', response.text)
+                except Exception as e:
+                    print(f"Произошла ошибка при загрузке прокси из списка '{list_title}': {str(e)}")
+
+            # If we're merging files, save all proxies to one file
+            if merge_files and all_proxies:
+                # Create a filename based on selected list names
+                if len(selected_list_names) <= 3:
+                    # If 3 or fewer lists, include all names in the filename
+                    lists_part = "_".join(selected_list_names)
+                else:
+                    # If more than 3 lists, use the first list name and a count
+                    lists_part = f"{selected_list_names[0]}_and_{len(selected_list_names) - 1}_more"
+
+                merged_filename = f"{lists_part}.{file_ext}"
+
+                try:
+                    with open(merged_filename, "w") as file:
+                        file.write("\n".join(all_proxies))
+
+                    print(f"\nВсе прокси успешно объединены и сохранены в файл '{merged_filename}'.")
+                except Exception as e:
+                    print(f"Ошибка при сохранении объединенного файла: {str(e)}")
+
+            print(f"\nУспешно обработано {successful_downloads} из {len(valid_selections)} выбранных списков.")
+
+        except ValueError:
+            print("Ошибка: Введите числовое значение.")
+        except Exception as e:
+            print(f"Произошла ошибка: {str(e)}")
+
     def load_previous_countries(self):
         """Load previously used countries from a file"""
         if os.path.exists(self.previous_countries_file):
@@ -180,7 +407,7 @@ class ProxySellerAPI:
         if not use_previous:
             # Получаем данные о гео
             print("\nВыберите страну (доступные: US, GB, CA, DE, FR, NL, etc.)")
-            country = input("Введите код или коды нескольких стран через запятую: ").upper().replace(" ","")
+            country = input("Введите код или коды нескольких стран через запятую: ").upper().replace(" ", "")
             region = input("Введите регион (или оставьте пустым): ")
             city = input("Введите город (или оставьте пустым): ")
             isp = input("Введите провайдера (или оставьте пустым): ")
@@ -295,8 +522,6 @@ class ProxySellerAPI:
                     elif format_type == 2:
                         # login:password:host:port
                         proxy = f"{login}:{password}:{base_host}:{port}"
-                        # host:port@login:password
-                        proxy = f"{base_host}:{port}@{login}:{password}"
                     elif format_type == 3:
                         # host:port:login:password
                         proxy = f"{base_host}:{port}:{login}:{password}"
@@ -474,9 +699,10 @@ def display_menu():
     print("       ProxySeller API Manager")
     print("=" * 50)
     print("1. Получить существующие списки IP")
-    print("2. Создать новый список (или несколько)")
-    print("3. Переименовать список")
-    print("4. Удалить списки")
+    print("2. Скачать прокси из существующего списка")
+    print("3. Создать новый список (или несколько)")
+    print("4. Переименовать список")
+    print("5. Удалить списки")
     print("0. Выход")
     print("=" * 50)
     return input("Выберите опцию: ")
@@ -494,14 +720,18 @@ def main():
             input("\nНажмите Enter для продолжения...")
 
         elif choice == "2":
-            proxy_api.create_lists()
+            proxy_api.download_proxies()
             input("\nНажмите Enter для продолжения...")
 
         elif choice == "3":
-            proxy_api.rename_list()
+            proxy_api.create_lists()
             input("\nНажмите Enter для продолжения...")
 
         elif choice == "4":
+            proxy_api.rename_list()
+            input("\nНажмите Enter для продолжения...")
+
+        elif choice == "5":
             proxy_api.delete_list()
             input("\nНажмите Enter для продолжения...")
 
