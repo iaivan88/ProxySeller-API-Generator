@@ -180,7 +180,7 @@ class ProxySellerAPI:
         if not use_previous:
             # Получаем данные о гео
             print("\nВыберите страну (доступные: US, GB, CA, DE, FR, NL, etc.)")
-            country = input("Введите код страны или несколько кодов: ").upper().replace(" ","")
+            country = input("Введите код или коды нескольких стран через запятую: ").upper().replace(" ","")
             region = input("Введите регион (или оставьте пустым): ")
             city = input("Введите город (или оставьте пустым): ")
             isp = input("Введите провайдера (или оставьте пустым): ")
@@ -204,9 +204,9 @@ class ProxySellerAPI:
         # Choose proxy format
         print("\nВыберите формат прокси:")
         print("1. login:password@host:port (default)")
-        print("2. host:port@login:password")
+        print("2. login:password:host:port")
         print("3. host:port:login:password")
-        print("4. login:password:host:port")
+        print("4. host:port@login:password")
 
         format_choice = input("Выберите формат [1]: ") or "1"
         proxy_format = int(format_choice) if format_choice.isdigit() and 1 <= int(format_choice) <= 4 else 1
@@ -293,14 +293,16 @@ class ProxySellerAPI:
                         # login:password@host:port
                         proxy = f"{login}:{password}@{base_host}:{port}"
                     elif format_type == 2:
+                        # login:password:host:port
+                        proxy = f"{login}:{password}:{base_host}:{port}"
                         # host:port@login:password
                         proxy = f"{base_host}:{port}@{login}:{password}"
                     elif format_type == 3:
                         # host:port:login:password
                         proxy = f"{base_host}:{port}:{login}:{password}"
                     elif format_type == 4:
-                        # login:password:host:port
-                        proxy = f"{login}:{password}:{base_host}:{port}"
+                        # host:port@login:password
+                        proxy = f"{base_host}:{port}@{login}:{password}"
                     else:
                         # Default format
                         proxy = f"{login}:{password}@{base_host}:{port}"
