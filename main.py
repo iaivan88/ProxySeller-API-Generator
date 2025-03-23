@@ -180,7 +180,7 @@ class ProxySellerAPI:
         if not use_previous:
             # Получаем данные о гео
             print("\nВыберите страну (доступные: US, GB, CA, DE, FR, NL, etc.)")
-            country = input("Введите код страны (несколько стран вводятся без пробела!): ").upper()
+            country = input("Введите код страны или несколько кодов: ").upper().replace(" ","")
             region = input("Введите регион (или оставьте пустым): ")
             city = input("Введите город (или оставьте пустым): ")
             isp = input("Введите провайдера (или оставьте пустым): ")
@@ -366,7 +366,7 @@ class ProxySellerAPI:
             print(f"Произошла ошибка: {str(e)}")
 
     def delete_list(self):
-        """Delete multiple existing IP lists"""
+        """Delete multiple existing IP lists with support for range selection"""
         # First, get all lists
         lists = self.get_lists()
         available_lists = self.display_lists(lists)
@@ -376,8 +376,31 @@ class ProxySellerAPI:
 
         # Ask for list selection
         try:
-            selection_input = input("\nВыберите номера списков для удаления (через запятую, например: 1,3,5): ")
-            selections = [int(x.strip()) for x in selection_input.split(',') if x.strip().isdigit()]
+            print("\nВы можете выбрать списки следующими способами:")
+            print("1. Отдельные номера через запятую (например: 1,3,5)")
+            print("2. Диапазон в квадратных скобках (например: [10, 20])")
+            selection_input = input("\nВыберите номера списков для удаления: ")
+
+            selections = []
+
+            # Check if it's a range in square brackets
+            if selection_input.strip().startswith('[') and selection_input.strip().endswith(']'):
+                # Extract the range
+                range_content = selection_input.strip()[1:-1]  # Remove the brackets
+                range_parts = [part.strip() for part in range_content.split(',')]
+
+                if len(range_parts) == 2 and range_parts[0].isdigit() and range_parts[1].isdigit():
+                    start = int(range_parts[0])
+                    end = int(range_parts[1])
+
+                    # Create a list of all numbers in the range (inclusive)
+                    selections = list(range(start, end + 1))
+                else:
+                    print("Ошибка: Неверный формат диапазона. Ожидается [start, end].")
+                    return
+            else:
+                # Process as comma-separated list
+                selections = [int(x.strip()) for x in selection_input.split(',') if x.strip().isdigit()]
 
             # Validate selections
             valid_selections = []
