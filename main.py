@@ -359,7 +359,21 @@ class ProxySellerAPI:
             print(f"Ошибка при сохранении предыдущих стран: {str(e)}")
 
     def create_lists(self):
-        """Create one or multiple new IP lists"""
+        """Create one or multiple new IP lists with country presets"""
+        # Define country presets
+        country_presets = {
+            "1": {"name": "Worldwide", "countries": ""},
+            "2": {"name": "Europe",
+                  "countries": "AT,AL,AD,BY,BE,BG,BA,GB,HU,DE,GR,GE,DK,IE,ES,IT,IS,LV,LT,LI,LU,MK,MT,MD,NO,PL,PT,RU,RO,SM,RS,SK,SI,UA,FI,FR,HR,ME,CZ,CH,SE,EE"},
+            "3": {"name": "Asia",
+                  "countries": "AZ,AM,AF,BD,BH,VN,IL,IN,ID,JO,IQ,IR,YE,KZ,KH,QA,CY,KG,CN,KP,KR,KW,LA,LB,MY,MV,MN,MM,NP,AE,OM,PK,PS,SA,SY,TJ,TH,TM,TR,UZ,PH,LK,JP"},
+            "4": {"name": "South America", "countries": "AR,BO,BR,VE,GY,CO,PY,PE,SR,UY,CL,EC"},
+            "5": {"name": "North America",
+                  "countries": "AG,BS,BB,BZ,HT,GT,HN,GD,DM,DO,CA,CR,CU,MX,NI,PA,SV,VC,KN,LC,US,TT,JM"},
+            "6": {"name": "Africa",
+                  "countries": "DZ,AO,BJ,BW,BI,BF,GA,GM,GH,GN,GW,DJ,EG,ZM,CV,CM,KE,KM,CI,LS,LR,LY,MU,MR,MW,ML,MA,MZ,NA,NE,NG,RW,ST,SC,SN,SO,SD,SL,TZ,TG,TN,UG,CF,TD,PG,GQ,ER,ET,ZA,SS"}
+        }
+
         print("\n=== Создание нового списка прокси ===")
         title = input("Введите название списка: ")
 
@@ -373,47 +387,31 @@ class ProxySellerAPI:
             num_lists = 1
             print("Ошибка ввода. Установлено значение по умолчанию: 1 список.")
 
-        # Load previously used countries
-        previous_countries = self.load_previous_countries()
+        # Display country presets
+        print("\nПредустановленные паки стран:")
+        for key, preset in country_presets.items():
+            print(f"{key}. {preset['name']}")
+        print("0. Ручной ввод стран")
 
-        # If there are previously used countries, ask if the user wants to use them
-        use_previous = False
-        if previous_countries:
-            print("\nРанее использованные страны:")
-            for i, (country, data) in enumerate(previous_countries.items(), 1):
-                print(f"{i}. {country} (Последнее использование: {data.get('last_used', 'N/A')})")
+        # Select country preset or manual input
+        preset_choice = input("\nВыберите пак или 0 для ручного ввода: ")
 
-            choice = input("\nИспользовать одну из предыдущих стран? (y/n, или номер страны): ")
-
-            if choice.lower() == 'y' and previous_countries:
-                # Use the most recently used country
-                newest_country = max(previous_countries.items(), key=lambda x: x[1].get('last_used', ''))
-                country = newest_country[0]
-                region = newest_country[1].get('region', '')
-                city = newest_country[1].get('city', '')
-                isp = newest_country[1].get('isp', '')
-                use_previous = True
-                print(f"Используется страна: {country}")
-            elif choice.isdigit() and 1 <= int(choice) <= len(previous_countries):
-                # Use the selected country
-                selected_country = list(previous_countries.items())[int(choice) - 1]
-                country = selected_country[0]
-                region = selected_country[1].get('region', '')
-                city = selected_country[1].get('city', '')
-                isp = selected_country[1].get('isp', '')
-                use_previous = True
-                print(f"Используется страна: {country}")
-
-        if not use_previous:
-            # Получаем данные о гео
-            print("\nВыберите страну (доступные: US, GB, CA, DE, FR, NL, etc.)")
+        if preset_choice in country_presets:
+            country = country_presets[preset_choice]['countries']
+            print(f"Выбран пак: {country_presets[preset_choice]['name']}")
+        elif preset_choice == "0":
             country = input("Введите код или коды нескольких стран через запятую: ").upper().replace(" ", "")
-            region = input("Введите регион (или оставьте пустым): ")
-            city = input("Введите город (или оставьте пустым): ")
-            isp = input("Введите провайдера (или оставьте пустым): ")
+        else:
+            print("Неверный выбор. Будет использован ручной ввод.")
+            country = input("Введите код или коды нескольких стран через запятую: ").upper().replace(" ", "")
 
-            # Save the country for future use
-            self.save_previous_countries(country, region, city, isp)
+        # Rest of the method remains the same as in the original implementation
+        region = input("Введите регион (или оставьте пустым): ")
+        city = input("Введите город (или оставьте пустым): ")
+        isp = input("Введите провайдера (или оставьте пустым): ")
+
+        # Save the country for future use
+        self.save_previous_countries(country, region, city, isp)
 
         # Получаем информацию о портах
         try:
