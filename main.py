@@ -400,10 +400,10 @@ class ProxySellerAPI:
             country = country_presets[preset_choice]['countries']
             print(f"Выбран пак: {country_presets[preset_choice]['name']}")
         elif preset_choice == "0":
-            country = input("Введите код или коды нескольких стран через запятую: ").upper().replace(" ", "")
+            country = input("Введите код или коды нескольких стран через запятую (https://www.iban.com/country-codes - коды стран): ").upper().replace(" ", "")
         else:
             print("Неверный выбор. Будет использован ручной ввод.")
-            country = input("Введите код или коды нескольких стран через запятую: ").upper().replace(" ", "")
+            country = input("Введите код или коды нескольких стран через запятую (https://www.iban.com/country-codes - коды стран):: ").upper().replace(" ", "")
 
         # Rest of the method remains the same as in the original implementation
         region = input("Введите регион (или оставьте пустым): ")
@@ -415,7 +415,7 @@ class ProxySellerAPI:
 
         # Получаем информацию о портах
         try:
-            num_ports = int(input("Введите количество портов на список (максимум 1000): ") or "1000")
+            num_ports = int(input("Введите количество портов на список (максимум и по умолчанию 1000): ") or "1000")
             if num_ports > 1000:
                 num_ports = 1000
                 print("Максимальное количество портов ограничено до 1000.")
